@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coach's Computer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: a gym scoreboard on top, one big card per puzzle below, station colours match the paper folders. */
+:root {
+  --bg: #EEF2F7; --panel: #FFFFFF; --ink: #14233B; --muted: #55657F; --line: #CFD8E6;
+  --navy: #1F3A5F; --gold: #F5B700; --good: #1B7F46; --bad: #B8321F; --soft: #F4F7FB;
+  --s1: #1F5FA8; --s2: #2A7F4F; --s3: #6C4AA0; --s4: #BF5F0D; --s5: #0E7C7F;
+  --display: 'Lilita One', 'Trebuchet MS', system-ui, sans-serif;
+  --body: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0D1829; --panel: #162640; --ink: #EAF1FB; --muted: #A3B3CC; --line: #2C4165;
+    --navy: #0A1322; --gold: #F5B700; --good: #4CC784; --bad: #FF8A78; --soft: #1B2F4D;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0D1829; --panel: #162640; --ink: #EAF1FB; --muted: #A3B3CC; --line: #2C4165;
+  --navy: #0A1322; --gold: #F5B700; --good: #4CC784; --bad: #FF8A78; --soft: #1B2F4D;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 18px; line-height: 1.45; }
+h1, h2, h3 { font-family: var(--display); font-weight: 400; letter-spacing: .01em; margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(30px, 6vw, 46px); line-height: 1.05; }
+h2 { font-size: clamp(24px, 4.5vw, 32px); line-height: 1.1; }
+h3 { font-size: 21px; }
+p { margin: 0; }
+a { color: inherit; }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+
+.board { background: #0A1322; color: #fff; border-bottom: 4px solid var(--gold); }
+.board-in { max-width: 980px; margin: 0 auto; padding: 14px 16px; display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: center; justify-content: space-between; }
+.brand { font-family: var(--display); font-size: 26px; letter-spacing: .04em; text-transform: uppercase; }
+.brand small { display: block; font-family: var(--body); font-size: 13px; letter-spacing: .08em; color: #9FB3D1; font-weight: 700; }
+.tokens { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 13px; letter-spacing: .1em; color: #9FB3D1; }
+.discs { display: flex; gap: 7px; }
+.disc { width: 24px; height: 24px; border-radius: 50%; border: 3px solid var(--gold); }
+.disc.on { background: var(--gold); box-shadow: 0 0 12px rgba(245,183,0,.55); }
+.disc.off { opacity: .3; }
+
+main { max-width: 980px; margin: 0 auto; padding: 20px 16px 60px; }
+.view[hidden], [hidden] { display: none !important; }
+.back { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 14px; font-weight: 800; text-decoration: none; padding: 8px 14px; border-radius: 999px; background: var(--panel); border: 2px solid var(--line); }
+.back:hover { border-color: var(--gold); }
+
+.intro { display: grid; gap: 10px; margin-bottom: 22px; }
+.intro p { color: var(--muted); max-width: 62ch; }
+.steps { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.steps span { background: var(--panel); border: 2px solid var(--line); border-radius: 999px; padding: 6px 14px; font-weight: 700; font-size: 16px; }
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+.tile { --c: var(--navy); position: relative; display: grid; gap: 6px; padding: 16px 16px 16px 22px; background: var(--panel); border: 2px solid var(--line); border-radius: 14px; text-decoration: none; overflow: hidden; }
+.tile::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 10px; background: var(--c); }
+a.tile:hover { border-color: var(--c); transform: translateY(-2px); }
+.tile .num { font-family: var(--display); font-size: 15px; color: var(--c); letter-spacing: .12em; text-transform: uppercase; }
+.tile h3 { font-size: 24px; }
+.tile p { color: var(--muted); font-size: 16px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 4px; }
+.chip { border-radius: 999px; padding: 4px 12px; font-weight: 800; font-size: 14px; background: var(--soft); border: 2px solid var(--line); }
+.chip.paper { border-style: dashed; }
+.chip.done { background: var(--good); color: #fff; border-color: var(--good); }
+.bigletter { font-family: var(--display); font-size: 34px; line-height: 1; color: var(--c); margin-left: auto; }
+.tile.wide { grid-column: 1 / -1; }
+
+.card { background: var(--panel); border: 2px solid var(--line); border-radius: 16px; padding: 18px 16px; display: grid; gap: 14px; margin-top: 14px; }
+.stationhead { --c: var(--navy); background: var(--c); color: #fff; border-radius: 16px; padding: 18px 18px 16px; display: grid; gap: 6px; }
+.stationhead .num { font-family: var(--display); font-size: 15px; letter-spacing: .14em; text-transform: uppercase; opacity: .85; }
+.stationhead p { opacity: .95; max-width: 60ch; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 10px 20px; border-radius: 12px; border: 0; background: var(--navy); color: #fff; font-weight: 800; cursor: pointer; }
+:root[data-theme="dark"] .btn { background: var(--gold); color: #1a1a1a; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn { background: var(--gold); color: #1a1a1a; } }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.ghost { background: var(--soft); color: var(--ink); border: 2px dashed var(--muted); }
+:root[data-theme="dark"] .btn.ghost { background: var(--soft); color: var(--ink); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn.ghost { background: var(--soft); color: var(--ink); } }
+
+.hint { background: var(--soft); border-left: 6px solid var(--gold); border-radius: 8px; padding: 10px 14px; font-size: 17px; }
+.hints { display: grid; gap: 8px; }
+
+/* Letter salad */
+.salad { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 820px) { .salad { grid-template-columns: minmax(0, 520px) minmax(0, 1fr); } }
+.grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 3px; width: 100%; max-width: 520px; touch-action: none; user-select: none; -webkit-user-select: none; }
+.cell { aspect-ratio: 1; min-width: 0; overflow: hidden; display: grid; place-items: center; background: var(--soft); border: 2px solid var(--line); border-radius: 6px; font-weight: 800; font-size: clamp(12px, 3.6vw, 22px); cursor: pointer; }
+@media (max-width: 480px) { .grid { gap: 2px; } .cell { border-width: 1.5px; border-radius: 4px; } }
+.cell.sel { background: var(--gold); border-color: var(--gold); color: #1a1a1a; }
+.cell.found { color: #14233B; border-color: transparent; }
+.cell.left { outline: 3px solid var(--gold); outline-offset: -3px; }
+.cell.bad { background: var(--bad); color: #fff; border-color: var(--bad); }
+.wordlist { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.wordlist li { background: var(--soft); border: 2px solid var(--line); border-radius: 999px; padding: 4px 12px; font-weight: 800; font-size: 15px; letter-spacing: .04em; }
+.wordlist li.got { background: var(--good); border-color: var(--good); color: #fff; text-decoration: line-through; }
+.counter { font-family: var(--display); font-size: 22px; }
+.secret { display: grid; gap: 12px; }
+.strip { display: flex; flex-wrap: wrap; gap: 4px; }
+.strip .t { width: 32px; height: 40px; display: grid; place-items: center; background: var(--gold); color: #1a1a1a; font-weight: 800; border-radius: 6px; }
+.strip { row-gap: 10px; column-gap: 16px; }
+.strip .w { display: inline-flex; gap: 4px; }
+.answer { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.field { display: grid; gap: 4px; }
+.field label { font-weight: 800; font-size: 15px; color: var(--muted); }
+input.in { min-height: 48px; border-radius: 12px; border: 2px solid var(--line); background: var(--panel); padding: 8px 14px; width: 100%; font-weight: 700; }
+input.in:focus { border-color: var(--gold); outline: none; box-shadow: 0 0 0 3px rgba(245,183,0,.4); }
+input.one { width: 76px; text-align: center; font-family: var(--display); font-size: 32px; text-transform: uppercase; padding: 6px; }
+input.ok { border-color: var(--good); background: color-mix(in srgb, var(--good) 14%, var(--panel)); }
+.msg { font-weight: 800; }
+.msg:empty { display: none; }
+.msg.good { color: var(--good); }
+.msg.bad { color: var(--bad); }
+.found-letter { display: none; align-items: center; gap: 16px; background: var(--soft); border: 3px solid var(--good); border-radius: 14px; padding: 12px 16px; }
+.found-letter.show { display: flex; }
+.found-letter .big { font-family: var(--display); font-size: 64px; line-height: 1; color: var(--good); }
+.found-letter p { font-weight: 800; }
+
+/* Anagrams */
+.stack { display: grid; gap: 16px; }
+.riddle { margin: 10px 0 14px; padding: 14px 16px; background: var(--soft); border-left: 6px solid var(--s4); border-radius: 10px; font-size: 1.1em; line-height: 1.6; }
+.howto { margin: 8px 0 0; padding-left: 22px; display: grid; gap: 8px; }
+a.btn { text-decoration: none; }
+.chip.locked { background: var(--soft); opacity: .8; }
+.ticks { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin: 12px 0; }
+.ticks label { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 14px; background: var(--soft); border: 2px solid var(--line); border-radius: 12px; font-weight: 800; cursor: pointer; }
+.ticks input { width: 24px; height: 24px; accent-color: var(--s2); }
+.ticks label.ok { border-color: var(--good); }
+.patients { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+.patient { border: 2px solid var(--line); border-radius: 14px; padding: 14px; display: grid; gap: 10px; background: var(--soft); }
+.patient.solved { border-color: var(--good); }
+.patient .who { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.patient .who b { font-family: var(--display); font-weight: 400; font-size: 24px; }
+.patient .who span { color: var(--muted); font-weight: 700; }
+.scr { display: flex; flex-wrap: wrap; gap: 4px; }
+.scr i { font-style: normal; width: 30px; height: 38px; display: grid; place-items: center; background: #6C4AA0; color: #fff; font-weight: 800; border-radius: 6px; }
+.sentence { font-weight: 800; color: var(--good); }
+.firsts { color: var(--muted); font-weight: 800; letter-spacing: .15em; }
+
+/* Number lock */
+.lock { display: grid; gap: 12px; }
+.dial { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; background: var(--soft); border: 2px solid var(--line); border-radius: 14px; padding: 12px 14px; }
+.dial b { font-weight: 800; }
+.shackle { display: none; font-family: var(--display); font-size: 22px; padding: 14px; border-radius: 14px; background: var(--good); color: #fff; }
+.shackle.show { display: block; }
+.shackle small { display: block; font-family: var(--body); font-weight: 700; font-size: 16px; margin-top: 4px; }
+
+/* Riddles */
+.riddle { display: grid; gap: 8px; background: var(--soft); border: 2px solid var(--line); border-radius: 14px; padding: 12px 14px; }
+.riddle.solved { border-color: var(--good); }
+.riddle .row { display: flex; gap: 10px; flex-wrap: wrap; }
+.riddle .row input { flex: 1 1 160px; }
+.stars { font-family: var(--display); font-size: 26px; color: var(--gold); letter-spacing: .12em; }
+
+/* Door */
+.door { display: grid; gap: 14px; }
+.lettersrow { display: flex; gap: 10px; flex-wrap: wrap; }
+.free { display: none; gap: 14px; }
+.free.show { display: grid; }
+.free h2 { color: var(--good); }
+.backup summary { cursor: pointer; font-weight: 800; padding: 10px 0; }
+.backup[open] summary { margin-bottom: 8px; }
+.backup > * + * { margin-top: 10px; }
+.plan { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.plan li { display: flex; gap: 12px; align-items: center; background: var(--soft); border: 2px solid var(--line); border-radius: 12px; padding: 10px 14px; font-weight: 700; }
+.plan input { width: 26px; height: 26px; accent-color: var(--good); }
+.pop { animation: pop .5s ease-out; }
+@keyframes pop { from { transform: scale(.94); opacity: .4; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .pop { animation: none; } a.tile:hover { transform: none; } }
+.foot { margin-top: 36px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; color: var(--muted); font-size: 15px; }
+.foot button { border: 0; background: none; text-decoration: underline; cursor: pointer; color: var(--muted); padding: 6px; }
+</style>
+</head>
+<body>
+<header class="board">
+  <div class="board-in">
+    <div class="brand">Coach's Computer<small>Mission: save Coach Sam</small></div>
+    <div class="tokens" role="status" aria-label="Hint tokens left on this device">HINT TOKENS <span class="discs" id="tok"></span></div>
+  </div>
+</header>
+
+<main>
+  <!-- HOME -->
+  <section class="view" id="view-home">
+    <div class="intro">
+      <h1>Coach Sam is locked in!</h1>
+      <p>Solve stations 1 to 4 and collect four letters. You can do these stations in any order. Split up and tell your team what you find. Then open Coach's Door (final step 1) and finish with Coach's Orders (final step 2).</p>
+      <div class="steps"><span>1 Solve a station</span><span>2 Tell your team the letter</span><span>3 Open the door, then follow Coach's orders</span></div>
+    </div>
+    <div class="tiles" id="tiles"></div>
+    <div class="foot">
+      <span>Progress is saved on this device.</span>
+      <button type="button" id="reset">Start again</button>
+      <span id="reset-ask" hidden>Delete all progress? <button type="button" id="reset-yes">Yes, start again</button> <button type="button" id="reset-no">No</button></span>
+    </div>
+  </section>
+
+  <!-- STATION 1 -->
+  <section class="view" id="view-salad" hidden>
+    <a class="back" href="#">&larr; Back to the stations</a>
+    <div class="stationhead" style="--c: var(--s1)">
+      <span class="num">Station 1 &middot; Letter Salad</span>
+      <h2>Find the hidden body parts</h2>
+      <p>All 17 words from your list are hiding in this grid. Drag your finger over a word (right, down or diagonal), or tap its first and last letter.</p>
+    </div>
+    <div class="card">
+      <div class="salad">
+        <div><div class="grid" id="grid" aria-label="Letter grid"></div></div>
+        <div style="display:grid;gap:12px">
+          <div class="counter" id="counter" role="status"></div>
+          <ul class="wordlist" id="wordlist"></ul>
+        </div>
+      </div>
+    </div>
+    <div class="card secret" id="secret" hidden>
+      <h3>The leftover letters are a secret message</h3>
+      <p>Read the yellow squares like a book: left to right, top to bottom. The gaps show where a new word starts.</p>
+      <div class="strip" id="strip"></div>
+      <p><b>Which letter does the message tell you to take?</b></p>
+      <div class="answer">
+        <input class="in one" id="s1-answer" aria-label="Your letter" maxlength="1" autocomplete="off" autocapitalize="characters">
+        <button class="btn" type="button" id="s1-check">Check</button>
+      </div>
+      <div class="msg" id="s1-msg" role="status"></div>
+    </div>
+    <div class="found-letter" id="s1-done"><span class="big">T</span><p>Letter found! Tell your team and write it on the Control Panel.</p></div>
+    <div class="card"><h3>Need help?</h3><div class="hints" id="s1-hints"></div></div>
+  </section>
+
+  <!-- STATION 3 -->
+  <section class="view" id="view-anagrams" hidden>
+    <a class="back" href="#">&larr; Back to the stations</a>
+    <div class="stationhead" style="--c: var(--s3)">
+      <span class="num">Station 3 &middot; Patient Anagrams</span>
+      <h2>Eight patients, eight mixed-up words</h2>
+      <p>Each patient says where it hurts, but the letters are mixed up. Share the patients in your team. Unscramble the body part and type it.</p>
+    </div>
+    <div class="card"><div class="patients" id="patients"></div></div>
+    <div class="card" id="an-q" hidden>
+      <h3>Coach's question</h3>
+      <p>Who likes <b>tennis</b>? Which body part hurts? Type its <b>first letter</b>.</p>
+      <div class="answer">
+        <input class="in one" id="s3-answer" aria-label="Your letter" maxlength="1" autocomplete="off" autocapitalize="characters">
+        <button class="btn" type="button" id="s3-check">Check</button>
+      </div>
+      <div class="msg" id="s3-msg" role="status"></div>
+    </div>
+    <div class="found-letter" id="s3-done"><span class="big">A</span><p>Letter found! Tell your team and write it on the Control Panel.</p></div>
+    <div class="card"><h3>Need help?</h3><div class="hints" id="s3-hints"></div></div>
+  </section>
+
+  <!-- STATION 2 = FINAL -->
+  <section class="view" id="view-orders" hidden>
+    <a class="back" href="#">&larr; Back to the stations</a>
+    <div class="stationhead" style="--c: var(--s2)">
+      <span class="num">Final &middot; Step 2 &middot; Coach's Orders</span>
+      <h2>Coach's secret code</h2>
+      <p>Coach Sam has one last lock. It opens with a code that only Coach can say.</p>
+    </div>
+    <div class="card" id="s2-locked">
+      <h3>This station is locked</h3>
+      <p>First open Coach's Door (final step 1) with the letters from stations 1 to 4.</p>
+      <div class="answer"><a class="btn" href="#coach-door">Go to Coach's Door</a></div>
+    </div>
+    <div id="s2-main" hidden class="stack">
+      <div class="card">
+        <h3>How it works</h3>
+        <ol class="howto">
+          <li><b>All players</b> go to <b>Frau Halser</b> together. Take a pencil.</li>
+          <li>Frau Halser reads Coach's orders. <b>Everybody</b> does the movement, but <b>only</b> when you hear &laquo;<b>Coach says</b>&raquo;. No &laquo;Coach says&raquo;? It is a trap. Stand still!</li>
+          <li>After every &laquo;Coach says&raquo; order, write the <b>first letter</b> of the body part. Keep the letters in order.</li>
+          <li>Come back and type the four letters here. They make a word.</li>
+        </ol>
+      </div>
+      <div class="card" id="s2-form-card">
+        <h3>Coach's code</h3>
+        <form id="s2-form" class="door">
+          <div class="lettersrow">
+            <div class="field"><label for="cl0">Letter 1</label><input class="in one cl" id="cl0" maxlength="1" autocomplete="off" autocapitalize="characters"></div>
+            <div class="field"><label for="cl1">Letter 2</label><input class="in one cl" id="cl1" maxlength="1" autocomplete="off" autocapitalize="characters"></div>
+            <div class="field"><label for="cl2">Letter 3</label><input class="in one cl" id="cl2" maxlength="1" autocomplete="off" autocapitalize="characters"></div>
+            <div class="field"><label for="cl3">Letter 4</label><input class="in one cl" id="cl3" maxlength="1" autocomplete="off" autocapitalize="characters"></div>
+          </div>
+          <div class="answer"><button class="btn" type="submit">Free Coach</button></div>
+          <div class="msg" id="s2-msg" role="status"></div>
+        </form>
+        <div class="hints" id="s2-hints"></div>
+      </div>
+      <div class="card free" id="s2-free">
+        <h2 class="pop">Coach is free! Thank you, team!</h2>
+        <p><b>Coach Sam says:</b> &ldquo;You listened very well! Now it's time to warm up for Sports Day. Do the workout together.&rdquo;</p>
+        <ul class="plan" id="plan"></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- STATION 4 -->
+  <section class="view" id="view-poses" hidden>
+    <a class="back" href="#">&larr; Back to the stations</a>
+    <div class="stationhead" style="--c: var(--s4)">
+      <span class="num">Station 4 &middot; Back-to-back Poses</span>
+      <h2>Find the envelope</h2>
+      <p>Coach hid the pose cards in an envelope. Solve the riddle to find it. Two players, then back to back.</p>
+    </div>
+    <div class="card">
+      <h3>Part 1: Coach's riddle</h3>
+      <blockquote class="riddle">I have a <b>neck</b>, a <b>body</b> and a <b>head</b>, but I am not a person.<br>I have six strings.<br>You play me with your <b>fingers</b>.<br>What am I?</blockquote>
+      <div class="answer">
+        <input class="in" id="s4r-answer" aria-label="Your answer" autocomplete="off" autocapitalize="none" placeholder="Type one word">
+        <button class="btn" type="button" id="s4r-check">Check</button>
+      </div>
+      <div class="msg" id="s4r-msg" role="status"></div>
+    </div>
+    <div id="s4-rest" hidden class="stack">
+      <div class="card">
+        <h3>Part 2: Build the poses</h3>
+        <p><b>Go to the guitar.</b> Next to it you find the envelope. Take it back to your table.</p>
+        <ol class="howto">
+          <li>Stand <b>back to back</b>. Person A takes a card and describes the pose in English. Person B builds the pose.</li>
+          <li>Turn around and compare with the card. (A mirror image is OK!)</li>
+          <li>Swap roles. Do all four cards.</li>
+          <li>Then finish the sentences below.</li>
+        </ol>
+      </div>
+      <div class="card"><div class="patients" id="poses"></div></div>
+      <div class="card" id="s4-q" hidden>
+        <h3>Coach's question</h3>
+        <p>Look at <b>card 4</b>. What is the finger touching? Type the <b>first letter</b> of the body part.</p>
+        <div class="answer">
+          <input class="in one" id="s4-answer" aria-label="Your letter" maxlength="1" autocomplete="off" autocapitalize="characters">
+          <button class="btn" type="button" id="s4-check">Check</button>
+        </div>
+        <div class="msg" id="s4-msg" role="status"></div>
+      </div>
+      <div class="found-letter" id="s4-done"><span class="big">M</span><p>Letter found! Tell your team and write it on the Control Panel.</p></div>
+    </div>
+    <div class="card"><h3>Need help?</h3><div class="hints" id="s4-hints"></div></div>
+  </section>
+
+  <!-- STATION 5 -->
+  <section class="view" id="view-lock" hidden>
+    <a class="back" href="#">&larr; Back to the stations</a>
+    <div class="stationhead" style="--c: var(--s5)">
+      <span class="num">Station 2 &middot; Number Lock</span>
+      <h2>Open Coach's lock</h2>
+      <p>A four-number lock protects Coach's secret letter. Answer the questions with one digit each.</p>
+    </div>
+    <div class="card lock" id="dials"></div>
+    <div class="shackle" id="shackle">Click! The lock is open.<small id="place"></small></div>
+    <div class="card" id="s5-q" hidden>
+      <h3>Coach's note</h3>
+      <p>Look at <b>question 2</b>. Which body part is in it? Type its <b>first letter</b>.</p>
+      <div class="answer">
+        <input class="in one" id="s5-answer" aria-label="Your letter" maxlength="1" autocomplete="off" autocapitalize="characters">
+        <button class="btn" type="button" id="s5-check">Check</button>
+      </div>
+      <div class="msg" id="s5-msg" role="status"></div>
+    </div>
+    <div class="found-letter" id="s5-done"><span class="big">E</span><p>Letter found! Tell your team and write it on the Control Panel.</p></div>
+    <div class="card"><h3>Need help?</h3><div class="hints" id="s5-hints"></div></div>
+  </section>
+
+  <!-- BONUS -->
+  <section class="view" id="view-riddles" hidden>
+    <a class="back" href="#">&larr; Back to the stations</a>
+    <div class="stationhead" style="--c: var(--navy)">
+      <span class="num">Level up &middot; Coach's Riddles</span>
+      <h2>Who am I?</h2>
+      <p>Finished early? Read each riddle and type the body part. Type one word.</p>
+    </div>
+    <div class="card"><div class="stars" id="stars" aria-live="polite"></div><div class="lock" id="riddles"></div></div>
+  </section>
+
+  <!-- DOOR -->
+  <section class="view" id="view-door" hidden>
+    <a class="back" href="#">&larr; Back to the stations</a>
+    <div class="stationhead" style="--c: var(--navy)">
+      <span class="num">Final &middot; Step 1 &middot; Coach's Door</span>
+      <h2>Enter the team password</h2>
+      <p>Type the four letters from stations 1 to 4. They are mixed up! Which word do they make? Work together.</p>
+    </div>
+    <div class="card door" id="door-card">
+      <form id="door-form" class="door">
+        <div class="lettersrow">
+          <div class="field"><label for="dl0">Letter 1</label><input class="in one dl" id="dl0" maxlength="1" autocomplete="off" autocapitalize="characters"></div>
+          <div class="field"><label for="dl1">Letter 2</label><input class="in one dl" id="dl1" maxlength="1" autocomplete="off" autocapitalize="characters"></div>
+          <div class="field"><label for="dl2">Letter 3</label><input class="in one dl" id="dl2" maxlength="1" autocomplete="off" autocapitalize="characters"></div>
+          <div class="field"><label for="dl3">Letter 4</label><input class="in one dl" id="dl3" maxlength="1" autocomplete="off" autocapitalize="characters"></div>
+        </div>
+        <div class="answer"><button class="btn" type="submit">Open the door</button></div>
+        <div class="msg" id="door-msg" role="status"></div>
+      </form>
+      <div class="hints" id="door-hints"></div>
+    </div>
+    <div class="card free" id="free">
+      <h2 class="pop">The team password is right!</h2>
+      <p><b>Coach Sam says:</b> &ldquo;Thank you! But my door has a second lock. It opens with a secret code that only I can say. Please go to <b>Frau Halser</b> together. <b>All of you</b> must come!&rdquo;</p>
+      <div class="answer"><a class="btn" href="#coachs-orders">Go to the final mission</a></div>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  var D = {"seed": 6, "n": 12, "grid": ["TAKETTEETHHE", "FARMOUTHTIRS", "SHOULDERUTNB", "LNFOOTETMTOA", "EREOFTHEMPSC", "ARTCATTHYEEK", "ENDOKFINGERB", "LFYHOBURFOOO", "EHEADTOHURRN", "GAKNEEYNHIPE", "HERDLPMEETOE"], "words": ["head", "ear", "nose", "mouth", "teeth", "neckbone", "shoulder", "arm", "hand", "finger", "tummy", "backbone", "hip", "leg", "knee", "foot", "toe"], "message": "TAKETHEFIRSTLETTEROFTHEPARTATTHEENDOFYOURFOOTHURRYHELPME", "placed": {"neckbone": [3, 1, 1, 1], "shoulder": [2, 0, 0, 1], "backbone": [2, 11, 1, 0], "finger": [6, 5, 0, 1], "mouth": [1, 3, 0, 1], "teeth": [0, 5, 0, 1], "tummy": [1, 8, 1, 0], "head": [8, 1, 0, 1], "nose": [2, 10, 1, 0], "hand": [7, 3, 1, 0], "knee": [9, 2, 0, 1], "foot": [3, 2, 0, 1], "ear": [8, 0, 1, 1], "arm": [1, 1, 0, 1], "hip": [9, 8, 0, 1], "leg": [7, 0, 1, 0], "toe": [10, 9, 0, 1]}, "free": [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [0, 10], [0, 11], [1, 0], [1, 9], [1, 10], [1, 11], [2, 9], [3, 0], [3, 6], [3, 7], [3, 9], [4, 0], [4, 1], [4, 3], [4, 4], [4, 5], [4, 6], [4, 7], [4, 9], [5, 0], [5, 1], [5, 2], [5, 4], [5, 5], [5, 6], [5, 7], [5, 9], [6, 0], [6, 1], [6, 2], [6, 3], [7, 1], [7, 2], [7, 4], [7, 6], [7, 7], [7, 8], [7, 9], [7, 10], [8, 5], [8, 7], [8, 8], [8, 9], [8, 10], [9, 6], [10, 0], [10, 1], [10, 4], [10, 5], [10, 6], [10, 7]]};
+  var MSG_WORDS = ['TAKE','THE','FIRST','LETTER','OF','THE','PART','AT','THE','END','OF','YOUR','FOOT','HURRY','HELP','ME'];
+  var PATIENTS = [
+    { id: 'ben',  name: 'Ben',  sport: 'swimming', ans: 'shoulder', scr: 'LUHEDORS', pron: 'His' },
+    { id: 'lara', name: 'Lara', sport: 'football', ans: 'knee',     scr: 'NEEK',     pron: 'Her' },
+    { id: 'tom',  name: 'Tom',  sport: 'tennis',   ans: 'arm',      scr: 'MRA',      pron: 'His' },
+    { id: 'mia',  name: 'Mia',  sport: 'running',  ans: 'foot',     scr: 'OFTO',     pron: 'Her' },
+    { id: 'finn', name: 'Finn', sport: 'climbing', ans: 'finger',   scr: 'GIFNER',   pron: 'His' },
+    { id: 'zoe',  name: 'Zoe',  sport: 'dancing',  ans: 'leg',      scr: 'GLE',      pron: 'Her' },
+    { id: 'leo',  name: 'Leo',  sport: 'hockey',   ans: 'hip',      scr: 'HPI',      pron: 'His' },
+    { id: 'emma', name: 'Emma', sport: 'gymnastics', ans: 'toe',    scr: 'OET',      pron: 'Her' }
+  ];
+  var POSES = [
+    { id: 'p1', n: 1, pre: 'Both hands are on the', acc: ['hips', 'hip'], show: 'hips', post: '.' },
+    { id: 'p2', n: 2, pre: 'One hand is on the', acc: ['head'], show: 'head', post: '.' },
+    { id: 'p3', n: 3, pre: 'Both hands are on the', acc: ['tummy', 'belly', 'stomach'], show: 'tummy', post: '.' },
+    { id: 'p4', n: 4, pre: 'One finger is on the', acc: ['mouth'], show: 'mouth', post: '.' }
+  ];
+  var NL = [
+    { q: 'How many fingers are on one hand?', a: 5 },
+    { q: 'How many ears do two kids have?', a: 4 },
+    { q: 'How many legs do three kids have?', a: 6 },
+    { q: 'How many noses do seven kids have?', a: 7 }
+  ];
+  var RID = [
+    { q: 'I am at the end of your arm. I have five fingers. What am I?', a: 'hand' },
+    { q: 'I am in the middle of your face. You smell with me. What am I?', a: 'nose' },
+    { q: 'I live in your mouth. I am white and I help you eat. We are many. What are we?', a: 'teeth' },
+    { q: 'I am in the middle of your leg. I can bend. What am I?', a: 'knee' },
+    { q: 'I am at the top of your body. I have two ears and a nose. What am I?', a: 'head' }
+  ];
+  var PLAN = ['Touch your toe. (5 times)', 'Lift your knee. (5 times)', 'Stretch your arm up. (5 times)',
+    'Put your hands on your hips. Move your hips. (10 seconds)', 'Open your mouth. Show your teeth. Smile!', 'Shout: We are a TEAM!'];
+  var STORE = 'coachpc-v1';
+
+  function $(s, r) { return (r || document).querySelector(s); }
+  function $$(s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); }
+
+  var state = { v: 1, tokens: 3, solved: {}, found: [], an: {}, nl: ['', '', '', ''], rid: {}, hints: {}, door: false, pose: {}, s4r: false };
+
+  function loadLocal() { try { var j = localStorage.getItem(STORE); return j ? JSON.parse(j) : null; } catch (e) { return null; } }
+  function save() { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} }
+
+  /* ---------- tokens and hints ---------- */
+  function renderTokens() {
+    var h = '';
+    for (var i = 0; i < 3; i++) h += '<span class="disc ' + (i < state.tokens ? 'on' : 'off') + '"></span>';
+    $('#tok').innerHTML = h;
+  }
+  function hintUI(boxId, key, list) {
+    var box = $(boxId);
+    box.innerHTML = '';
+    list.forEach(function (h, i) {
+      var id = key + '-' + i;
+      if (state.hints[id]) {
+        var d = document.createElement('div');
+        d.className = 'hint';
+        d.innerHTML = '<strong>Hint:</strong> ' + h.text;
+        box.appendChild(d);
+      } else {
+        var b = document.createElement('button');
+        b.type = 'button'; b.className = 'btn ghost';
+        b.textContent = state.tokens > 0 ? 'Use a hint token: ' + h.label : 'No hint tokens left';
+        b.disabled = state.tokens < 1;
+        b.addEventListener('click', function () {
+          if (state.tokens < 1) return;
+          state.tokens--; state.hints[id] = true; save(); renderTokens();
+          hintUI(boxId, key, list);
+          if (h.onUse) h.onUse();
+        });
+        box.appendChild(b);
+      }
+    });
+  }
+  function refreshHints() {
+    hintUI('#s1-hints', 's1', S1_HINTS);
+    hintUI('#s2-hints', 's2', S2_HINTS);
+    hintUI('#s3-hints', 's3', S3_HINTS);
+    hintUI('#s4-hints', 's4', S4_HINTS);
+    hintUI('#s5-hints', 's5', S5_HINTS);
+    hintUI('#door-hints', 'door', DOOR_HINTS);
+  }
+  var S1_HINTS = [
+    { label: 'where to start', text: 'The words go right, down or diagonal (down-right). Start with the long words: NECKBONE, BACKBONE and SHOULDER.' },
+    { label: 'about the message', text: 'Read the message to the end. It tells you which part of the body to look at. Check your own foot!' }
+  ];
+  var S2_HINTS = [
+    { label: 'about the traps', text: 'Only move when Frau Halser says «Coach says». Orders without it are traps. Do not write a letter for a trap.' },
+    { label: 'about the letters', text: 'Write only the first letter of the body parts after «Coach says». There are four of them. Keep them in order.' },
+    { label: 'about the word', text: 'The code is an English word. Coach wants to be ____ (not in danger).' }
+  ];
+  var S4_HINTS = [
+    { label: 'about the riddle', text: 'It is a musical instrument with strings. Think of the music corner in your classroom.' },
+    { label: 'about the cards', text: 'Look at the picture on each card. Where are the hands? Where is the finger?' },
+    { label: 'about card 4', text: 'Card 4: the finger is on your face. It is where you eat and talk.' }
+  ];
+  var S3_HINTS = [
+    { label: 'show the first letters', text: 'The first letter of every answer is shown on the cards.', onUse: function () { buildPatients(); } },
+    { label: 'about the question', text: 'Look at the sentence of the patient who likes tennis. Which body part is in it?' }
+  ];
+  var S5_HINTS = [
+    { label: 'how to start', text: 'Count on your own body. Ask your friends to help you count.' },
+    { label: 'the first digit', text: 'The first digit is 5.' },
+    { label: 'about the letter', text: 'Read question 2 again. The body part is in the question. It is a plural word (two ears).' }
+  ];
+  var DOOR_HINTS = [
+    { label: 'about the password', text: 'A group of players who work together is a ______.' }
+  ];
+
+  /* ---------- routing ---------- */
+  var ROUTES = { '': 'home', 'letter-salad': 'salad', 'anagrams': 'anagrams', 'number-lock': 'lock', 'riddles': 'riddles', 'coach-door': 'door', 'coachs-orders': 'orders', 'back-to-back': 'poses' };
+  function route() {
+    var h = (location.hash || '').replace('#', '');
+    var v = ROUTES.hasOwnProperty(h) ? ROUTES[h] : 'home';
+    $$('.view').forEach(function (s) { s.hidden = s.id !== 'view-' + v; });
+    if (v === 'home') renderHome();
+    window.scrollTo(0, 0);
+  }
+
+  /* ---------- home ---------- */
+  function tile(o) {
+    var done = o.done;
+    var tag = o.href ? 'a' : 'div';
+    var attrs = o.href ? ' href="' + o.href + '"' : '';
+    var chips = '';
+    if (o.locked) chips += '<span class="chip locked">Locked</span>';
+    else chips += '<span class="chip ' + (o.mixed ? 'paper' : '') + '">' + (o.mixed ? 'Paper + online' : 'Online') + '</span>';
+    if (done) chips += '<span class="chip done">Solved</span>';
+    var big = o.big ? '<span class="bigletter">' + o.big + '</span>' : '';
+    return '<' + tag + ' class="tile ' + (o.wide ? 'wide' : '') + '" style="--c:var(' + o.c + ')"' + attrs + '>' +
+      '<span class="num">' + o.num + '</span><h3>' + o.title + '</h3><p>' + o.text + '</p>' +
+      '<div class="chips">' + chips + big + '</div></' + tag + '>';
+  }
+  function renderHome() {
+    var s = state.solved;
+    $('#tiles').innerHTML =
+      tile({ num: 'Station 1', title: 'Letter Salad', text: 'Find the hidden body parts and read the secret message.', c: '--s1', href: '#letter-salad', done: s.s1, big: s.s1 ? 'T' : '' }) +
+      tile({ num: 'Station 2', title: 'Number Lock', text: 'Count body parts to open the lock and find a secret letter.', c: '--s5', href: '#number-lock', done: s.s5, big: s.s5 ? 'E' : '' }) +
+      tile({ num: 'Station 3', title: 'Patient Anagrams', text: 'Unscramble eight body parts and find out who needs help.', c: '--s3', href: '#anagrams', done: s.s3, big: s.s3 ? 'A' : '' }) +
+      tile({ num: 'Station 4', title: 'Back-to-back Poses', text: 'Solve a riddle, find the envelope and build the poses with a partner.', c: '--s4', href: '#back-to-back', mixed: true, done: s.s4, big: s.s4 ? 'M' : '' }) +
+      tile({ num: 'Level up', title: "Coach's Riddles", text: 'Finished early? Who am I? Five body part riddles.', c: '--navy', href: '#riddles', done: countRid() === RID.length }) +
+      tile({ num: 'Final · Step 1', title: "Coach's Door", text: 'Type the four mixed-up letters from stations 1 to 4 and find the team word.', c: '--navy', href: '#coach-door', done: state.door, wide: true }) +
+      tile({ num: 'Final · Step 2', title: "Coach's Orders", text: 'Everybody goes to Frau Halser and moves. Opens when the team word is right.', c: '--s2', href: state.door ? '#coachs-orders' : '', locked: !state.door, done: s.s2, wide: true });
+  }
+
+  /* ---------- station 1: letter salad ---------- */
+  var drag = null, anchor = null, sel = [], gridWired = false;
+  function cellEl(r, c) { return document.getElementById('c-' + r + '-' + c); }
+  function cellOf(el) {
+    var c = el && el.closest ? el.closest('.cell') : null;
+    return c ? [parseInt(c.dataset.r, 10), parseInt(c.dataset.c, 10)] : null;
+  }
+  function line(a, b) {
+    var dr = b[0] - a[0], dc = b[1] - a[1];
+    var n = Math.max(Math.abs(dr), Math.abs(dc));
+    if (n === 0) return [a];
+    if (!(dr === 0 || dc === 0 || Math.abs(dr) === Math.abs(dc))) return null;
+    var sr = Math.sign(dr), sc = Math.sign(dc), out = [];
+    for (var i = 0; i <= n; i++) out.push([a[0] + sr * i, a[1] + sc * i]);
+    return out;
+  }
+  function clearSel() { $$('.cell.sel').forEach(function (e) { e.classList.remove('sel'); }); sel = []; }
+  function showSel(cells) { clearSel(); sel = cells || []; sel.forEach(function (p) { cellEl(p[0], p[1]).classList.add('sel'); }); }
+  function markFound(word, cells) {
+    var idx = D.words.indexOf(word);
+    var color = 'hsl(' + ((idx * 53) % 360) + ' 75% 70%)';
+    cells.forEach(function (p) { var e = cellEl(p[0], p[1]); e.classList.add('found'); e.style.background = color; });
+  }
+  function tryWord(cells) {
+    var s = cells.map(function (p) { return D.grid[p[0]][p[1]]; }).join('').toLowerCase();
+    var rev = s.split('').reverse().join('');
+    var word = null;
+    D.words.forEach(function (w) { if (w === s || w === rev) word = w; });
+    if (word && cells.length > 1) {
+      if (state.found.indexOf(word) < 0) { state.found.push(word); save(); markFound(word, cells); renderSalad(); }
+      clearSel();
+    } else {
+      cells.forEach(function (p) { var e = cellEl(p[0], p[1]); e.classList.remove('sel'); e.classList.add('bad'); });
+      setTimeout(function () { $$('.cell.bad').forEach(function (e) { e.classList.remove('bad'); }); }, 350);
+      sel = [];
+    }
+  }
+  function buildSalad() {
+    var g = $('#grid');
+    g.innerHTML = '';
+    D.grid.forEach(function (row, r) {
+      row.split('').forEach(function (ch, c) {
+        var d = document.createElement('div');
+        d.className = 'cell'; d.id = 'c-' + r + '-' + c; d.dataset.r = r; d.dataset.c = c; d.textContent = ch;
+        g.appendChild(d);
+      });
+    });
+    $('#wordlist').innerHTML = D.words.map(function (w) { return '<li id="w-' + w + '">' + w.toUpperCase() + '</li>'; }).join('');
+    state.found.forEach(function (w) {
+      var p = D.placed[w];
+      var cells = [];
+      for (var i = 0; i < w.length; i++) cells.push([p[0] + p[2] * i, p[1] + p[3] * i]);
+      markFound(w, cells);
+    });
+    if (gridWired) return;
+    gridWired = true;
+    g.addEventListener('pointerdown', function (e) {
+      var c = cellOf(e.target);
+      if (!c) return;
+      e.preventDefault();
+      drag = { start: c, moved: false };
+      if (anchor) { var l = line(anchor, c); var a0 = anchor; anchor = null; drag = null; if (l) tryWord(l); else clearSel(); return; }
+      showSel([c]);
+    });
+    g.addEventListener('pointermove', function (e) {
+      if (!drag) return;
+      var el = document.elementFromPoint(e.clientX, e.clientY);
+      var c = cellOf(el);
+      if (!c) return;
+      var l = line(drag.start, c);
+      if (l) { if (l.length > 1) drag.moved = true; showSel(l); }
+    });
+    function end(e) {
+      if (!drag) return;
+      var el = document.elementFromPoint(e.clientX, e.clientY);
+      var c = cellOf(el) || drag.start;
+      var l = line(drag.start, c);
+      var d0 = drag; drag = null;
+      if (!l || l.length < 2) {
+        if (l && l.length === 1) { anchor = d0.start; showSel([d0.start]); }
+        else { clearSel(); }
+        return;
+      }
+      anchor = null;
+      tryWord(l);
+    }
+    g.addEventListener('pointerup', end);
+    g.addEventListener('pointercancel', function () { drag = null; clearSel(); });
+  }
+  function renderSalad() {
+    var n = state.found.length, total = D.words.length;
+    $('#counter').textContent = 'Found ' + n + ' of ' + total;
+    D.words.forEach(function (w) { $('#w-' + w).classList.toggle('got', state.found.indexOf(w) >= 0); });
+    var all = n === total;
+    $('#secret').hidden = !all;
+    D.free.forEach(function (p) { cellEl(p[0], p[1]).classList.toggle('left', all); });
+    if (all) renderStrip();
+    $('#s1-done').classList.toggle('show', !!state.solved.s1);
+    if (state.solved.s1) { $('#s1-answer').value = 'T'; $('#s1-answer').classList.add('ok'); }
+  }
+  function renderStrip() {
+    var msg = D.message, out = '';
+    var spaced = MSG_WORDS.join('') === msg;
+    if (spaced) {
+      MSG_WORDS.forEach(function (w) { out += '<span class="w">' + w.split('').map(function (ch) { return '<span class="t">' + ch + '</span>'; }).join('') + '</span>'; });
+    } else {
+      out = msg.split('').map(function (ch) { return '<span class="t">' + ch + '</span>'; }).join('');
+    }
+    $('#strip').innerHTML = out;
+  }
+  function checkS1() {
+    var v = $('#s1-answer').value.trim().toUpperCase();
+    var m = $('#s1-msg');
+    if (v === 'T') { state.solved.s1 = true; save(); m.textContent = ''; renderSalad(); }
+    else { m.className = 'msg bad'; m.textContent = v ? 'Not yet. Read the message again. Which body part is at the end of your foot?' : 'Type one letter.'; }
+  }
+
+  /* ---------- station 3: anagrams ---------- */
+  function allAnSolved() { return PATIENTS.every(function (p) { return state.an[p.id]; }); }
+  function buildPatients() {
+    var box = $('#patients');
+    var hasFirst = !!state.hints['s3-0'];
+    box.innerHTML = PATIENTS.map(function (p) {
+      var solved = !!state.an[p.id];
+      var tiles = p.scr.split('').map(function (ch) { return '<i>' + ch + '</i>'; }).join('');
+      var firsts = hasFirst && !solved ? '<div class="firsts">' + p.ans.charAt(0).toUpperCase() + ' ' + new Array(p.ans.length).join('_ ') + '</div>' : '';
+      return '<div class="patient ' + (solved ? 'solved' : '') + '" id="p-' + p.id + '">' +
+        '<div class="who"><b>' + p.name + '</b><span>likes ' + p.sport + '</span></div>' +
+        '<div class="scr" aria-label="Mixed-up letters">' + tiles + '</div>' + firsts +
+        '<div class="field"><label for="an-' + p.id + '">' + p.pron + ' ______ hurts.</label>' +
+        '<input class="in' + (solved ? ' ok' : '') + '" id="an-' + p.id + '" autocomplete="off" autocapitalize="none" value="' + (solved ? p.ans : '') + '"' + (solved ? ' readonly' : '') + '></div>' +
+        '<div class="sentence">' + (solved ? p.name + ' likes ' + p.sport + '. ' + p.pron + ' ' + p.ans + ' hurts.' : '') + '</div></div>';
+    }).join('');
+    PATIENTS.forEach(function (p) {
+      var inp = $('#an-' + p.id);
+      inp.addEventListener('input', function () {
+        if (inp.value.trim().toLowerCase() === p.ans) { state.an[p.id] = true; save(); buildPatients(); renderAnagrams(); }
+      });
+    });
+    renderAnagrams();
+  }
+  function renderAnagrams() {
+    $('#an-q').hidden = !allAnSolved();
+    $('#s3-done').classList.toggle('show', !!state.solved.s3);
+    if (state.solved.s3) { $('#s3-answer').value = 'A'; $('#s3-answer').classList.add('ok'); }
+  }
+  function checkS3() {
+    var v = $('#s3-answer').value.trim().toUpperCase();
+    var m = $('#s3-msg');
+    if (v === 'A') { state.solved.s3 = true; save(); m.textContent = ''; renderAnagrams(); }
+    else { m.className = 'msg bad'; m.textContent = v ? 'Not yet. Find the sentence of the tennis player.' : 'Type one letter.'; }
+  }
+
+  /* ---------- station 2: final orders ---------- */
+  var CODE = 'SAFE';
+  function renderFinal() {
+    var solved = !!state.solved.s2;
+    $('#s2-locked').hidden = !!state.door;
+    $('#s2-main').hidden = !state.door;
+    $('#s2-form-card').hidden = solved;
+    $('#s2-free').classList.toggle('show', solved);
+    if (solved) $$('.cl').forEach(function (inp, i) { inp.value = CODE.charAt(i); });
+  }
+  function wireFinal() {
+    var ins = $$('.cl');
+    ins.forEach(function (inp, i) {
+      inp.addEventListener('input', function () {
+        inp.value = inp.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
+        if (inp.value && ins[i + 1]) ins[i + 1].focus();
+      });
+      inp.addEventListener('keydown', function (e) { if (e.key === 'Backspace' && !inp.value && ins[i - 1]) ins[i - 1].focus(); });
+    });
+    $('#s2-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var v = ins.map(function (i) { return i.value.trim().toUpperCase(); });
+      var right = 0, m = $('#s2-msg');
+      v.forEach(function (ch, i) { if (ch === CODE.charAt(i)) right++; });
+      if (right === 4) { state.solved.s2 = true; save(); m.textContent = ''; renderFinal(); }
+      else if (v.join('').length < 4) { m.className = 'msg bad'; m.textContent = 'You need four letters. Did you write one for every «Coach says» order?'; }
+      else { m.className = 'msg bad'; m.textContent = right + ' of 4 letters are right. Listen again: only «Coach says» orders count.'; }
+    });
+  }
+
+  /* ---------- station 4: poses ---------- */
+  function allPosesOk() { return POSES.every(function (p) { return state.pose[p.id]; }); }
+  function checkRiddle4() {
+    var v = $('#s4r-answer').value.trim().toLowerCase().replace(/^(a|an|the)\s+/, ''), m = $('#s4r-msg');
+    if (v === 'guitar' || v === 'a guitar') { state.s4r = true; save(); m.textContent = ''; renderPoses(); }
+    else { m.className = 'msg bad'; m.textContent = v ? 'Not yet. Read the riddle again. What has a neck, a body and a head?' : 'Type one word.'; }
+  }
+  function buildPoses() {
+    $('#poses').innerHTML = POSES.map(function (p) {
+      var ok = !!state.pose[p.id];
+      return '<div class="patient ' + (ok ? 'solved' : '') + '"><div class="who"><b>Card ' + p.n + '</b></div>' +
+        '<div class="field"><label for="po-' + p.id + '">' + p.pre + ' ______' + p.post + '</label>' +
+        '<input class="in' + (ok ? ' ok' : '') + '" id="po-' + p.id + '" autocomplete="off" autocapitalize="none" value="' + (ok ? p.show : '') + '"' + (ok ? ' readonly' : '') + '></div>' +
+        '<div class="sentence">' + (ok ? p.pre + ' ' + p.show + p.post : '') + '</div></div>';
+    }).join('');
+    POSES.forEach(function (p) {
+      var inp = $('#po-' + p.id);
+      inp.addEventListener('input', function () {
+        if (p.acc.indexOf(inp.value.trim().toLowerCase()) >= 0) { state.pose[p.id] = true; save(); buildPoses(); }
+      });
+    });
+    renderPoses();
+  }
+  function renderPoses() {
+    $('#s4-rest').hidden = !state.s4r;
+    if (!state.s4r) { $('#s4r-answer').readOnly = false; $('#s4r-answer').classList.remove('ok'); $('#s4r-msg').textContent = ''; }
+    if (state.s4r) { $('#s4r-answer').value = 'guitar'; $('#s4r-answer').readOnly = true; $('#s4r-answer').classList.add('ok'); $('#s4r-msg').className = 'msg good'; $('#s4r-msg').textContent = 'Right! It is a guitar.'; }
+    $('#s4-q').hidden = !allPosesOk();
+    $('#s4-done').classList.toggle('show', !!state.solved.s4);
+    if (state.solved.s4) { $('#s4-answer').value = 'M'; $('#s4-answer').classList.add('ok'); }
+  }
+  function checkS4() {
+    var v = $('#s4-answer').value.trim().toUpperCase(), m = $('#s4-msg');
+    if (v === 'M') { state.solved.s4 = true; save(); m.textContent = ''; renderPoses(); }
+    else { m.className = 'msg bad'; m.textContent = v ? 'Not yet. Look at card 4 again.' : 'Type one letter.'; }
+  }
+
+  /* ---------- station 5: number lock ---------- */
+  function nlOpen() { return NL.every(function (d, i) { return String(state.nl[i]) === String(d.a); }); }
+  function buildDials() {
+    $('#dials').innerHTML = NL.map(function (d, i) {
+      var ok = String(state.nl[i]) === String(d.a);
+      return '<div class="dial"><div><b>' + (i + 1) + '.</b> ' + d.q + '</div>' +
+        '<input class="in one' + (ok ? ' ok' : '') + '" id="nl' + i + '" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="Digit ' + (i + 1) + '" value="' + (state.nl[i] || '') + '"></div>';
+    }).join('');
+    NL.forEach(function (d, i) {
+      var inp = $('#nl' + i);
+      inp.addEventListener('input', function () {
+        var v = inp.value.replace(/[^0-9]/g, '');
+        inp.value = v;
+        state.nl[i] = v;
+        inp.classList.toggle('ok', v === String(d.a));
+        save(); renderLock();
+      });
+    });
+    renderLock();
+  }
+  function renderLock() {
+    var open = nlOpen();
+    $('#shackle').classList.toggle('show', open);
+    $('#place').textContent = open ? 'Coach’s note: My secret letter is hiding in question 2.' : '';
+    $('#s5-q').hidden = !open;
+    $('#s5-done').classList.toggle('show', !!state.solved.s5);
+    if (state.solved.s5) { $('#s5-answer').value = 'E'; $('#s5-answer').classList.add('ok'); }
+  }
+  function checkS5() {
+    var v = $('#s5-answer').value.trim().toUpperCase(), m = $('#s5-msg');
+    if (v === 'E') { state.solved.s5 = true; save(); m.textContent = ''; renderLock(); }
+    else { m.className = 'msg bad'; m.textContent = v ? 'Not yet. Read question 2 again.' : 'Type one letter.'; }
+  }
+
+  /* ---------- riddles ---------- */
+  function norm(s) { return s.trim().toLowerCase().replace(/^(a|an|the|my|your)\s+/, ''); }
+  function riddleOk(r, v) { var n = norm(v); return n === r.a || n === r.a + 's'; }
+  function countRid() { return RID.filter(function (r, i) { return state.rid[i]; }).length; }
+  function buildRiddles() {
+    $('#riddles').innerHTML = RID.map(function (r, i) {
+      var ok = !!state.rid[i];
+      return '<div class="riddle ' + (ok ? 'solved' : '') + '"><p>' + (i + 1) + '. ' + r.q + '</p>' +
+        '<div class="row"><input class="in' + (ok ? ' ok' : '') + '" id="rd' + i + '" autocomplete="off" aria-label="Answer ' + (i + 1) + '" value="' + (ok ? r.a : '') + '"' + (ok ? ' readonly' : '') + '>' +
+        '<button class="btn" type="button" data-i="' + i + '"' + (ok ? ' disabled' : '') + '>Check</button></div>' +
+        '<div class="msg ' + (ok ? 'good' : '') + '" id="rm' + i + '">' + (ok ? 'Yes! It is a ' + r.a + '.' : '') + '</div></div>';
+    }).join('');
+    RID.forEach(function (r, i) {
+      function check() {
+        var v = $('#rd' + i).value;
+        if (riddleOk(r, v)) { state.rid[i] = true; save(); buildRiddles(); }
+        else { var m = $('#rm' + i); m.className = 'msg bad'; m.textContent = 'Not yet. Try again.'; }
+      }
+      var b = $('#riddles [data-i="' + i + '"]');
+      if (b) b.addEventListener('click', check);
+      var inp = $('#rd' + i);
+      inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') check(); });
+    });
+    var n = countRid(), st = '';
+    for (var k = 0; k < RID.length; k++) st += k < n ? '★' : '☆';
+    $('#stars').textContent = st + (n === RID.length ? '  Super fit!' : '');
+  }
+
+  /* ---------- door ---------- */
+  function buildDoor() {
+    $('#plan').innerHTML = PLAN.map(function (t, i) {
+      return '<li><input type="checkbox" id="pl' + i + '" aria-label="Done"><label for="pl' + i + '">' + (i + 1) + '. ' + t + '</label></li>';
+    }).join('');
+    var ins = $$('.dl');
+    ins.forEach(function (inp, i) {
+      inp.addEventListener('input', function () {
+        inp.value = inp.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
+        if (inp.value && ins[i + 1]) ins[i + 1].focus();
+      });
+      inp.addEventListener('keydown', function (e) { if (e.key === 'Backspace' && !inp.value && ins[i - 1]) ins[i - 1].focus(); });
+    });
+    $('#door-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var v = ins.map(function (i) { return i.value.trim().toUpperCase(); });
+      var target = 'TEAM'.split('');
+      var right = 0;
+      v.forEach(function (ch, i) { if (ch === target[i]) right++; });
+      var m = $('#door-msg');
+      if (right === 4) { state.door = true; save(); m.className = 'msg good'; m.textContent = ''; renderDoor(); }
+      else if (v.join('').length < 4) { m.className = 'msg bad'; m.textContent = 'You need four letters. Ask your team for the missing ones.'; }
+      else { m.className = 'msg bad'; m.textContent = right + ' of 4 letters are in the right place. Try another order. Which word do the letters make?'; }
+    });
+    renderDoor();
+  }
+  function renderDoor() {
+    $('#free').classList.toggle('show', !!state.door);
+    $('#door-form').hidden = !!state.door;
+    $('#door-hints').hidden = !!state.door;
+    renderFinal();
+    if (state.door) { $$('.dl').forEach(function (inp, i) { inp.value = 'TEAM'.charAt(i); }); }
+  }
+
+  /* ---------- reset ---------- */
+  function wireReset() {
+    $('#reset').addEventListener('click', function () { $('#reset-ask').hidden = false; $('#reset').hidden = true; });
+    $('#reset-no').addEventListener('click', function () { $('#reset-ask').hidden = true; $('#reset').hidden = false; });
+    $('#reset-yes').addEventListener('click', function () {
+      state = { v: 1, tokens: 3, solved: {}, found: [], an: {}, nl: ['', '', '', ''], rid: {}, hints: {}, door: false, pose: {}, s4r: false };
+      save();
+      $$('.dl').forEach(function (i) { i.value = ''; });
+      $('#s1-answer').value = ''; $('#s3-answer').value = '';
+      ['#s1-answer','#s3-answer','#s4-answer','#s5-answer','#s4r-answer'].forEach(function (q) { $(q).classList.remove('ok'); $(q).value = ''; });
+      $$('.cl').forEach(function (i) { i.value = ''; });
+      buildAll();
+      $('#reset-ask').hidden = true; $('#reset').hidden = false;
+    });
+  }
+
+  function buildAll() {
+    buildSalad(); renderSalad(); buildPatients(); renderFinal(); buildPoses(); buildDials(); buildRiddles(); renderDoor();
+    renderTokens(); refreshHints(); route();
+  }
+  var built = false;
+  function start(saved) {
+    var s = saved || loadLocal();
+    if (s && s.v === 1) state = s;
+    state.pose = state.pose || {};
+    if (!built) {
+      built = true;
+      $('#s1-check').addEventListener('click', checkS1);
+      $('#s1-answer').addEventListener('keydown', function (e) { if (e.key === 'Enter') checkS1(); });
+      $('#s4r-check').addEventListener('click', checkRiddle4);
+      $('#s4r-answer').addEventListener('keydown', function (e) { if (e.key === 'Enter') checkRiddle4(); });
+      $('#s5-check').addEventListener('click', checkS5);
+      $('#s5-answer').addEventListener('keydown', function (e) { if (e.key === 'Enter') checkS5(); });
+      $('#s4-check').addEventListener('click', checkS4);
+      $('#s4-answer').addEventListener('keydown', function (e) { if (e.key === 'Enter') checkS4(); });
+      $('#s3-check').addEventListener('click', checkS3);
+      $('#s3-answer').addEventListener('keydown', function (e) { if (e.key === 'Enter') checkS3(); });
+      buildDoorOnce(); wireFinal();
+      wireReset();
+      window.addEventListener('hashchange', route);
+    }
+    buildAll();
+  }
+  var doorBuilt = false;
+  function buildDoorOnce() { if (!doorBuilt) { doorBuilt = true; buildDoor(); } }
+  try { if (window.claude && window.claude.hot && window.claude.hot.snapshot) window.claude.hot.snapshot(function () { return state; }); } catch (e) {}
+  if (window.claude && window.claude.hot && window.claude.hot.ready) window.claude.hot.ready(function (d) { start(d && d.v === 1 ? d : null); });
+  else start(window.claude && window.claude.hot && window.claude.hot.data && window.claude.hot.data.v === 1 ? window.claude.hot.data : null);
+})();
+</script>
+</body>
+</html>
